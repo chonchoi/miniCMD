@@ -5,8 +5,9 @@
  * @create 2015/03/26
  */
 
-;(function (global) {
-    var isFunciton = function isFunction(obj) {
+;(function (Global) {
+    var modules = {},
+        isFunciton = function isFunction(obj) {
             return Object.prototype.toString.call(obj) === '[object Function]';
         },
         isArray = function isArray(obj) {
@@ -20,35 +21,7 @@
         },
         getExport = function getExport(id) {
             return modules[id].exports;
-        },
-        modules = {};
-    
-    /**
-     * @method build
-     * @param module {Object} 在函数内部，该对象只有三种属性id、deps和factory(*)会被程序处理
-     * @return {Object} 返回函数对外开放的API对象
-     * @description 获取该模块的公共API，并自动对依赖模块进行初始导入
-     * @modify 子丶言 2015/03/27
-     */
-    function build(module) {
-        module.exports = {};
-        
-        var parameters = [global.require, module.exports, module],
-            exports = module.factory.apply(module, 'deps' in module ? parameters.concat(module.deps.map(getExport)) : parameters);
-        
-        exports = !!exports ? extend(module.exports, exports) : module.exports;
-        
-        if ('id' in module) {
-            if (module.id in modules) {
-                throw '此模块已经存在：' + module.id;
-            } else {
-                modules[module.id] = {id: module.id, deps: module.deps || [], exports: exports};
-                return modules[module.id].exports;
-            }
-        } else {
-            return exports;
-        }
-    }
+        };
     
     /**
      * @method parseDeps
@@ -72,6 +45,33 @@
     }
     
     /**
+     * @method build
+     * @param module {Object} 在函数内部，该对象只有三种属性id、deps和factory(*)会被程序处理
+     * @return {Object} 返回函数对外开放的API对象
+     * @description 获取该模块的公共API，并自动对依赖模块进行初始导入
+     * @modify 子丶言 2015/03/27
+     */
+    function build(module) {
+        module.exports = {};
+        
+        var parameters = [Global.require, module.exports, module],
+            exports = module.factory.apply(module, 'deps' in module ? parameters.concat(module.deps.map(getExport)) : parameters);
+        
+        exports = !!exports ? extend(module.exports, exports) : module.exports;
+        
+        if ('id' in module) {
+            if (module.id in modules) {
+                throw '此模块已经存在：' + module.id;
+            } else {
+                modules[module.id] = {id: module.id, deps: module.deps || [], exports: exports};
+                return modules[module.id].exports;
+            }
+        } else {
+            return exports;
+        }
+    }
+    
+    /**
      * @method require
      * @param id {String|Array} 依赖模块id(列表)
      * @param callback {Function} 成功载入依赖模块后，自执行回调函数
@@ -80,11 +80,11 @@
      * @description 该函数执行后会自动注册为全局方法，用于获取由define定义的模块API
      * @modify 子丶言 2015/03/27
      */
-    global.require = function require(id, callback, exports) {
+    Global.require = function require(id, callback, exports) {
         if (isArray(id)) {
             exports = exports || {};
             id.forEach(function (name) {
-                exports[name] = global.require(name, callback, exports);
+                exports[name] = Global.require(name, callback, exports);
             });
             return exports;
         } else {
@@ -111,7 +111,7 @@
      *              目前尚不支持树状模块调用，即./或../形式；
      * @modify 子丶言 2015/03/27
      */
-    global.define = function define(id, deps, factory) {
+    Global.define = function define(id, deps, factory) {
         if (arguments.length === 3) {
             return build({id: id, deps: parseDeps(deps), factory: factory});
         } else if (arguments.length === 2) {
