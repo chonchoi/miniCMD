@@ -33,7 +33,7 @@
     function parseDeps(deps) {
         var depList = [];
         deps.forEach(function (id) {
-            if (depList.indexOf(id) === -1) {
+            if (depList.indexOf(id) === -1) {         
                 if (id in modules) {
                     depList.push(id);
                 } else {
@@ -48,8 +48,8 @@
      * @method build
      * @param module {Object} 在函数内部，该对象只有三种属性id、deps和factory(*)会被程序处理
      * @return {Object} 返回函数对外开放的API对象
-     * @description 获取该模块的公共API，并自动对依赖模块进行初始导入
-     * @modify 子丶言 2015/03/27
+     * @description 获取该模块的公共API，并自动对依赖模块进行初始导入。
+     * @modify 子丶言 2015/05/05
      */
     function build(module) {
         module.exports = {};
@@ -57,13 +57,25 @@
         var parameters = [Global.require, module.exports, module],
             exports = module.factory.apply(module, 'deps' in module ? parameters.concat(module.deps.map(getExport)) : parameters);
         
-        exports = !!exports ? extend(module.exports, exports) : module.exports;
+        exports = typeof exports === 'function' ? exports : extend(module.exports, exports);
         
         if ('id' in module) {
             if (module.id in modules) {
                 throw '此模块已经存在：' + module.id;
             } else {
                 modules[module.id] = {id: module.id, deps: module.deps || [], exports: exports};
+                
+                if (/\//.test(module.id)) {
+                    var dir = module.id.substring(0, module.id.lastIndexOf('/'));
+                    var name = module.id.slice(module.id.lastIndexOf('/') - module.id.length +1);
+                    if (!(dir in modules)) {
+                        throw '该父级接口尚未创建' + dir;
+                    }
+                    
+                    modules[dir].deps.push(module.id);
+                    modules[dir].exports[name] = modules[module.id].exports;
+                }
+                
                 return modules[module.id].exports;
             }
         } else {
@@ -81,10 +93,13 @@
      * @modify 子丶言 2015/03/27
      */
     Global.require = function require(id, callback, exports) {
+        // 用于内部调试，用于查看所有已注册模块
+        if (id === '*') return modules;
+        
         if (isArray(id)) {
             exports = exports || {};
             id.forEach(function (name) {
-                exports[name] = Global.require(name, callback, exports);
+                exports[name] = require(name, callback, exports);
             });
             return exports;
         } else {
@@ -107,7 +122,7 @@
      * @return {Object} 默认返回模块公共API
      * @description 该函数执行后会自动注册为全局方法，用于封装函数模块，默认返回封装后的公共API。
      *              该函数的参数可选，若构建后的模块对象无id，则该模块不会被`注册`到模块列表中，并以匿名函数的形态返回公共API
-     *              模块的id可以采用树状或命名空间形式进行注册，即HMY/tools/parse或HMY.tools.parse的形式，建议统一采用HMY/tools/parse形式
+     *              模块的id可以采用树状形式进行注册，统一采用HMY/tools/parse形式
      *              目前尚不支持树状模块调用，即./或../形式；
      * @modify 子丶言 2015/03/27
      */
